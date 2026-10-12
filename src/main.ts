@@ -12,7 +12,8 @@ import { renderLeaderboard } from './results';
 import { Scheduler } from './scheduler';
 import { createGame, fruitForLevel, jevActors, step, type Controls, type GameState } from './sim';
 import { cuesBetween, snapshot, Sound } from './sound';
-import { RECORDINGS, TOP_RECORDED_SCORE } from './recordings';
+import { RECORDINGS, TOP_RECORDED_SCORE, watchName } from './recordings';
+import { CLIPS } from './clips';
 import { checkPlayerGame } from './player-check';
 import { Recorder, roundDt, type Recording } from './replay';
 import { GameStats } from './stats';
@@ -36,8 +37,8 @@ const KEYS: Record<string, Dir> = {
   ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
   w: 'up', s: 'down', a: 'left', d: 'right',
 };
-/** Chip order under the board: jev first (its recorded benchmark game plays when the page opens), then by rank. */
-const WATCH_ORDER = ['typesafe/jev-1.13.0', 'opper/clef', 'opper/clef-flash', 'openai/gpt-6-luna-decisions', 'microsoft/decision-1', 'empiriolabs/aplomb-1', 'opper/kev-4b', 'berget/convaiinnovations/laya'];
+/** Chip order under the board: the leaderboard's, ours and the community's together, once it loads (till then, the recordings'). */
+let watchOrder = Object.keys(RECORDINGS);
 const LINEUP_KEY = 'jevman.ghosts';
 const BEST_KEY = 'jevman.best';
 const $ = <T extends HTMLElement = HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
@@ -312,7 +313,7 @@ function setPlate(label: string | null = null): void {
     plateLabel.textContent = label;
     return;
   }
-  plateLabel.textContent = mode.kind === 'recording' ? modelName(mode.model) : 'You';
+  plateLabel.textContent = mode.kind === 'recording' ? watchName(mode.model) : 'You';
   const lineup = mode.kind === 'play' ? mode.lineup : null;
   const models = lineup ? [...new Set(GHOST_IDS.map((g) => lineup[g]))] : [];
   ghostsEl.textContent = !lineup ? 'Classic' : models.length === 1 ? short(models[0]!) : 'Mixed AIs';
@@ -321,7 +322,7 @@ function setPlate(label: string | null = null): void {
 function renderChips(): void {
   const current = mode.kind === 'recording' ? mode.model : null;
   chipsEl.replaceChildren(
-    ...WATCH_ORDER.filter((m) => RECORDINGS[m] !== undefined).map((m) => {
+    ...watchOrder.filter((m) => RECORDINGS[m] !== undefined).map((m) => {
       const chip = document.createElement('button');
       chip.type = 'button';
       chip.className = 'chip';
@@ -329,14 +330,113 @@ function renderChips(): void {
       chip.setAttribute('aria-checked', String(m === current));
       const logo = logoFor(m);
       if (logo) chip.append(logo);
-      chip.append(modelName(m));
-      chip.title = `${modelName(m)}'s recorded benchmark game`;
+      chip.append(watchName(m));
+      chip.title = `${watchName(m)}'s recorded benchmark game`;
       tag(chip, 'click_watch', { source: 'chips', model: m });
       chip.addEventListener('click', () => watch(m));
-      return chip;
+      return m === current && CLIPS[m] ? withDownload(m, chip) : chip;
     }),
   );
+  syncSave();
 }
+
+// ---------- the watched game's highlight, to save ----------
+// Two ways to the same two files: the ↓ beside Sound on the board, and the ↓ on the chip being watched.
+const saveBtn = $<HTMLButtonElement>('#save');
+const saveMenu = $('#save-menu');
+const mb = (bytes: number) => `${(bytes / 1e6).toFixed(1)} MB`;
+const make = <K extends keyof HTMLElementTagNameMap>(tagName: K, text?: string, cls?: string): HTMLElementTagNameMap[K] => {
+  const e = document.createElement(tagName);
+  if (text !== undefined) e.textContent = text;
+  if (cls) e.className = cls;
+  return e;
+};
+function downloadIcon(): SVGSVGElement {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  for (const [k, v] of Object.entries({ width: '15', height: '15', viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': 'true' })) svg.setAttribute(k, v);
+  const path = document.createElementNS(ns, 'path');
+  for (const [k, v] of Object.entries({ d: 'M8 2.5V10M5 7.2l3 3 3-3M3 13h10', stroke: 'currentColor', 'stroke-width': '1.6', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' })) path.setAttribute(k, v);
+  svg.append(path);
+  return svg;
+}
+/** A link that downloads the model's highlight (the 18 s MP4 or the 10 s GIF), counted as click_download. */
+function clipLink(model: string, format: 'mp4' | 'gif', source: string): HTMLAnchorElement {
+  const clip = CLIPS[model]!;
+  const a = make('a');
+  a.href = appPath(`/clips/${clip.file}.${format}`);
+  a.download = `jevman-${clip.file}-highlight.${format}`;
+  return tag(a, 'click_download', { source, model, format });
+}
+
+/** The board's ↓ shows while a recording with a highlight plays; a new game or another model closes its menu. */
+function syncSave(): void {
+  const watching = mode.kind === 'recording' && CLIPS[mode.model] ? mode.model : null;
+  saveBtn.hidden = watching === null;
+  if (watching) saveBtn.setAttribute('aria-label', `Save ${watchName(watching)}'s highlight`);
+  closeSave();
+}
+function closeSave(): void {
+  saveMenu.hidden = true;
+  saveBtn.setAttribute('aria-expanded', 'false');
+}
+function openSave(): void {
+  if (mode.kind !== 'recording' || !CLIPS[mode.model]) return;
+  const model = mode.model;
+  const fmts = make('div', undefined, 'fmts');
+  fmts.append(Object.assign(clipLink(model, 'mp4', 'board'), { textContent: 'MP4' }), Object.assign(clipLink(model, 'gif', 'board'), { textContent: 'GIF' }));
+  saveMenu.replaceChildren(make('p', 'Save this game', 't'), make('p', 'Its best 18 seconds', 's'), fmts);
+  saveMenu.setAttribute('aria-label', `Save ${watchName(model)}'s highlight`);
+  saveMenu.hidden = false;
+  saveBtn.setAttribute('aria-expanded', 'true');
+}
+saveBtn.addEventListener('click', () => (saveMenu.hidden ? openSave() : closeSave()));
+// Picking a file starts its download and closes the menu.
+saveMenu.addEventListener('click', (e) => {
+  if ((e.target as Element).closest('a')) setTimeout(closeSave);
+});
+
+/** The chip being watched, with a ↓ behind it that opens the same two files in the page's own look. */
+function withDownload(model: string, chip: HTMLButtonElement): HTMLElement {
+  const name = watchName(model);
+  const clip = CLIPS[model]!;
+  const pick = make('span', undefined, 'chip-pick');
+  const dl = make('button', undefined, 'chip-dl');
+  dl.type = 'button';
+  dl.setAttribute('aria-label', `Save ${name}'s highlight`);
+  dl.setAttribute('aria-haspopup', 'true');
+  dl.setAttribute('aria-expanded', 'false');
+  dl.setAttribute('aria-controls', 'chip-menu');
+  dl.append(downloadIcon());
+  const menu = make('div', undefined, 'chip-menu');
+  menu.id = 'chip-menu';
+  menu.hidden = true;
+  const item = (format: 'mp4' | 'gif', label: string, meta: string) => {
+    const a = clipLink(model, format, 'chips');
+    a.append(downloadIcon(), make('b', label), make('small', meta));
+    return a;
+  };
+  menu.append(make('p', `${name}'s best 18 seconds`, 't'), item('mp4', 'Video', `MP4 · ${mb(clip.mp4)}`), item('gif', 'GIF', `10 s · ${mb(clip.gif)}`));
+  dl.addEventListener('click', () => setChipMenu(menu.hidden !== false));
+  menu.addEventListener('click', (e) => {
+    if ((e.target as Element).closest('a')) setTimeout(() => setChipMenu(false));
+  });
+  pick.append(chip, dl, menu);
+  return pick;
+}
+/** Opens or closes the watched chip's menu, kept inside the window on a narrow screen. */
+function setChipMenu(open: boolean): void {
+  const menu = chipsEl.querySelector<HTMLElement>('.chip-menu');
+  const dl = chipsEl.querySelector<HTMLElement>('.chip-dl');
+  if (!menu || !dl) return;
+  menu.hidden = !open;
+  dl.setAttribute('aria-expanded', String(open));
+  if (!open) return;
+  menu.style.left = '0px';
+  const over = menu.getBoundingClientRect().right - (document.documentElement.clientWidth - 12);
+  if (over > 0) menu.style.left = `${-over}px`;
+}
+const chipMenuOpen = () => chipsEl.querySelector('.chip-menu:not([hidden])') !== null;
 
 const setPaused = (p: boolean) => {
   paused = p;
@@ -384,7 +484,7 @@ function showRecording(model: string = mode.kind === 'recording' ? mode.model : 
   dim(false);
   mode = { kind: 'recording', model };
   setPaused(false);
-  const subject: Subject = { kind: 'pacman', model, recorded: true };
+  const subject: Subject = { kind: 'pacman', model, recorded: true, name: RECORDINGS[model]?.name };
   if (r) {
     let entry = players.get(model);
     if (!entry) {
@@ -459,11 +559,11 @@ function watch(model: string, confirmed = false): void {
   notice(null);
   if (loaded.has(model)) return showRecording(model);
   const token = ++watchToken;
-  setPlate(`Loading ${modelName(model)}'s game…`);
+  setPlate(`Loading ${watchName(model)}'s game…`);
   void loadFor(model).then((r) => {
     if (token !== watchToken) return; // something else went on the board meanwhile
     setPlate();
-    if (!r) return notice(`${modelName(model)}'s recorded game didn't load. Try again in a moment.`);
+    if (!r) return notice(`${watchName(model)}'s recorded game didn't load. Try again in a moment.`);
     loaded.set(model, r);
     showRecording(model);
   });
@@ -480,7 +580,7 @@ function askToLeave(model: string): void {
     setPaused(false);
   });
   notice(null);
-  noticeEl.append(`End your game and watch ${modelName(model)}? `, end, ' · ', keep);
+  noticeEl.append(`End your game and watch ${watchName(model)}? `, end, ' · ', keep);
   noticeEl.hidden = false;
 }
 
@@ -755,11 +855,13 @@ function togglePause(): void {
   }
   setPaused(!paused);
 }
-// A click on the game pauses it, another resumes (not on its cards, the Play button, the sound button or a note).
+// A click on the game pauses it, another resumes (not on its cards, the Play button, the sound or save buttons, the
+// save menu or a note). With the save menu open, a click on the game only closes the menu.
 boardEl.addEventListener('click', (e) => {
   const t = e.target as Element;
   // A target no longer in the page was a card's button that just started a game: not a click on the game itself.
-  if (!t.isConnected || t.closest('.overlay, .play-cta, .board-notice, .sound-btn')) return;
+  if (!t.isConnected || t.closest('.overlay, .play-cta, .board-notice, .sound-btn, .save-menu')) return;
+  if (!saveMenu.hidden) return closeSave();
   togglePause();
 });
 tag(playCta, 'click_play', { source: 'board' });
@@ -770,6 +872,9 @@ document.addEventListener('click', (e) => {
   const t = e.target as Element;
   if (picker && t.isConnected && !t.closest('.overlay .card, #play-cta')) closePicker();
   if (scoresOpen && t.isConnected && !t.closest('.overlay .card, .arcade-top .mid')) closeScores();
+  // The save menus close on a click anywhere else (the board's own handler closes its menu over the game).
+  if (!saveMenu.hidden && t.isConnected && !t.closest('.board')) closeSave();
+  if (chipMenuOpen() && t.isConnected && !t.closest('.chip-pick')) setChipMenu(false);
 });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && live && !paused && overlayEl.hidden) setPaused(true);
@@ -800,6 +905,10 @@ window.addEventListener('keydown', (e) => {
     }
     return;
   }
+  if (e.key === 'Escape' && (!saveMenu.hidden || chipMenuOpen())) {
+    closeSave();
+    return setChipMenu(false);
+  }
   if (e.key === 'Escape' && picker) return closePicker();
   if (e.key === 'Escape' && scoresOpen) return closeScores();
   const k = e.key.toLowerCase();
@@ -821,6 +930,10 @@ void Promise.all([
     // The cabinet's HIGH SCORE: the best single game any model played in the benchmark.
     topAiScore = Math.max(TOP_RECORDED_SCORE, ...b.entries.map((e) => e.bestScore ?? 0));
     renderLeaderboard($<HTMLTableElement>('#leaderboard-table'), $('#leaderboard-list'), $('#leaderboard-sub'), b, community);
+    // The chips in the leaderboard's order: by mean score, ours first on an equal one (as the table ranks them).
+    const ranked = [...b.entries, ...community.entries].sort((x, y) => y.meanScore - x.meanScore).map((e) => e.model);
+    watchOrder = [...ranked.filter((m) => RECORDINGS[m] !== undefined), ...Object.keys(RECORDINGS).filter((m) => !ranked.includes(m))];
+    renderChips();
   })
   .catch(() => {
     $('#leaderboard-sub').textContent = 'The leaderboard could not be loaded. Try again in a moment.';

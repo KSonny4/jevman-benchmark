@@ -275,6 +275,26 @@ main { display: block; padding-bottom: 96px; }
 .sound-btn .off, .sound-btn.off .on { display: none; }
 .sound-btn.off .off { display: inline; }
 @media (hover: none) { .sound-btn { opacity: 0.8; } }
+/* Save: the watched game's highlight, beside Sound and shown the same way; its menu in the arcade's look. */
+.save-btn { right: 44px; }
+.save-btn[hidden], .save-menu[hidden], .overlay:not([hidden]) ~ .save-menu { display: none; }
+.save-btn[aria-expanded='true'] { opacity: 1; color: var(--j-arc-yellow); }
+.save-tip { position: absolute; top: calc(100% + 6px); right: 0; padding: 6px 8px; border: 1px solid var(--j-arc-yellow); border-radius: 3px; background: #000; color: var(--j-arc-yellow); font: 7px/1 var(--j-pixel); letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 120ms; }
+.save-btn:hover .save-tip, .save-btn:focus-visible .save-tip { opacity: 1; }
+.save-btn[aria-expanded='true'] .save-tip { display: none; }
+@media (hover: none) { .save-tip { display: none; } }
+.save-menu {
+  position: absolute; z-index: 2; top: 46px; right: 8px; width: 216px; box-sizing: border-box; display: grid; gap: 10px; padding: 14px 12px 12px;
+  border: 2px solid var(--j-maze); border-radius: 6px; background: #000; box-shadow: inset 0 0 0 3px #000, inset 0 0 0 5px var(--j-maze), 0 18px 40px -10px rgba(0, 0, 0, 0.8);
+  font-family: var(--j-pixel); line-height: 1.5; text-align: left; text-transform: uppercase;
+}
+.save-menu .t { margin: 0; font-size: 9px; color: var(--j-arc-yellow); }
+.save-menu .s { margin: 0; font-size: 7px; line-height: 1.7; color: #8f97ff; }
+.save-menu .fmts { display: flex; gap: 8px; }
+.save-menu a { flex: 1; display: inline-flex; align-items: center; justify-content: center; min-height: 36px; border: 2px solid var(--j-arc-yellow); border-radius: 4px; color: var(--j-arc-yellow); font-size: 9px; text-decoration: none; }
+.save-menu a + a { border-color: var(--j-maze); color: #fff; }
+.save-menu a:hover, .save-menu a:focus-visible { background: var(--j-arc-yellow); color: #000; }
+.save-menu a + a:hover, .save-menu a + a:focus-visible { background: var(--j-maze); color: #fff; }
 .board-notice { position: absolute; z-index: 3; left: 10px; right: 10px; top: 10px; margin: 0; padding: 12px; border: 2px solid var(--j-maze); border-radius: 4px; background: #000; box-shadow: inset 0 0 0 3px #000, inset 0 0 0 5px var(--j-maze), 0 10px 24px -10px rgba(0, 0, 0, 0.7); color: #fff; font: 8px/1.8 var(--j-pixel); text-transform: uppercase; text-align: center; }
 .board-notice a { color: var(--j-arc-yellow); text-decoration: underline; text-underline-offset: 3px; }
 .board-notice button { margin: 8px 4px 0; padding: 7px 10px; border: 2px solid var(--j-arc-yellow); border-radius: 4px; background: none; color: var(--j-arc-yellow); font: 8px/1 var(--j-pixel); text-transform: uppercase; }
@@ -306,6 +326,20 @@ main { display: block; padding-bottom: 96px; }
 .chip:hover { background: var(--j-soft); }
 .chip[aria-checked='true'] { background: var(--j-soft); border-color: var(--j-strong-line); }
 .chip .sub { font: 500 11px var(--j-mono); color: var(--j-muted); }
+/* The chip being watched carries its highlight's download: one pill, the chip and a ↓ behind a hairline. */
+.chip-pick { position: relative; display: inline-flex; align-items: stretch; border: 1px solid var(--j-strong-line); border-radius: 999px; background: var(--j-soft); }
+.chip-pick .chip, .chip-pick .chip:hover { border: 0; background: none; padding-right: 10px; }
+.chip-dl { position: relative; width: 32px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 0 999px 999px 0; background: none; color: var(--j-text); }
+.chip-dl::before { content: ''; position: absolute; left: 0; top: 7px; bottom: 7px; width: 1px; background: var(--j-strong-line); }
+.chip-dl:hover, .chip-dl[aria-expanded='true'] { background: var(--j-text); color: var(--j-bg); }
+.chip-dl:hover::before, .chip-dl[aria-expanded='true']::before { display: none; }
+.chip-menu { position: absolute; left: 0; top: calc(100% + 6px); z-index: 30; width: 236px; box-sizing: border-box; display: grid; gap: 2px; padding: 6px; border: 1px solid var(--j-line); border-radius: 14px; background: var(--j-card); box-shadow: 0 24px 50px -18px rgba(27, 46, 64, 0.45); text-align: left; }
+.chip-menu[hidden] { display: none; }
+.chip-menu .t { margin: 0; padding: 8px 10px 6px; font-size: 12px; color: var(--j-muted); white-space: normal; }
+.chip-menu a { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 10px; border-radius: 8px; color: inherit; text-decoration: none; }
+.chip-menu a:hover, .chip-menu a:focus-visible { background: var(--j-soft); }
+.chip-menu a b { flex: 1; font-size: 14px; font-weight: 600; }
+.chip-menu a small { font: 500 11px var(--j-mono); color: var(--j-muted); }
 
 /* Cards on the board */
 .card { background: var(--j-card); color: var(--j-text); border-radius: 16px; padding: 16px; width: min(400px, 100%); display: grid; gap: 12px; text-align: center; box-shadow: 0 20px 50px -20px rgba(0, 0, 0, 0.6); }
