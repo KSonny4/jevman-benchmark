@@ -24,6 +24,8 @@ export interface Subject {
   kind: 'pacman' | 'ghosts' | 'classic';
   /** The model playing Pac-Man, or the ghosts' models. */
   model?: string;
+  /** The Pac-Man model's name, when it isn't one of ours (a community model's own). */
+  name?: string;
   lineup?: Lineup;
   recorded?: boolean;
 }
@@ -196,7 +198,7 @@ export class ActivityLog {
   private heading(): { title: string; sub: string } {
     if (this.subject.kind === 'ghosts') return { title: this.over ? 'Their moves' : 'AI moves', sub: 'What the AIs playing the ghosts decided at each junction. The arrows on the board show the same odds.' };
     if (this.subject.kind === 'classic') return { title: 'Your game', sub: 'The classic ghosts: no AI here, just the key moments.' };
-    const name = this.subject.model ? modelName(this.subject.model) : 'The AI';
+    const name = this.subject.name ?? (this.subject.model ? modelName(this.subject.model) : 'The AI');
     return { title: 'Activity', sub: `What ${name} decides at each junction, with its odds. The arrows on the board show the same odds.` };
   }
 

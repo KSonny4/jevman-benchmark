@@ -12,6 +12,7 @@
     "deaths": "node --import tsx scripts/deaths.mts",
     "leaderboard": "node --env-file-if-exists=.env --import tsx scripts/bench.ts --models all",
     "submissions": "node --import tsx scripts/submissions.ts",
+    "clips": "node --import tsx scripts/clips.ts",
     "build": "vite build && vite build --ssr src/player-check.ts --outDir dist-ssr",
     "preview": "vite preview",
     "start": "node server/main.ts"

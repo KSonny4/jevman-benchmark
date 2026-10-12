@@ -45,13 +45,14 @@ describe('Replay', () => {
     expect(JSON.stringify(replay.state)).toBe(before);
   });
 
-  // Watch plays these: each must exist, be the model it is listed under, and replay exactly.
-  for (const [model, { path, score }] of Object.entries(RECORDINGS)) {
+  // Watch plays these: each must exist, be the model it is listed under (a community game carries the name its
+  // submitter gave), and replay exactly.
+  for (const [model, { path, score, name }] of Object.entries(RECORDINGS)) {
     const file = new URL(`../public${path}`, import.meta.url);
     it(`replays ${path} exactly (re-record if this fails after a sim change)`, () => {
       expect(existsSync(file), `public${path} is missing`).toBe(true);
       const rec = JSON.parse(readFileSync(file, 'utf8')) as Recording;
-      expect(rec.model).toBe(model);
+      expect(rec.model).toBe(name ?? model);
       const replay = new Replay(rec);
       while (!replay.done) replay.stepFrame();
       expect({ score: replay.state.score, lives: replay.state.lives, level: replay.state.level, frames: replay.frame }).toEqual(rec.final);
