@@ -1,4 +1,4 @@
-import { jointLeaders, type Community, type Leaderboard, type LeaderboardEntry } from '../shared/leaderboard';
+import { jointLeaders, type Community, type Leaderboard, type LeaderboardEntry, type ModelKind } from '../shared/leaderboard';
 import { logoFor, makerOf, pageOf } from './logos';
 import { tag } from './track';
 
@@ -46,17 +46,86 @@ function chevron(): SVGSVGElement {
   return svg;
 }
 
+/** What a row that isn't ranked is: a chat model or a baseline (rules, no model), shown at its score for reference. */
+const REFERENCE: Partial<Record<ModelKind, { tag: string; tip: string }>> = {
+  chat: { tag: 'Chat', tip: 'Chat model: an LLM that writes its answer. Shown at its score for reference, not ranked.' },
+  rules: { tag: 'Base', tip: 'Baseline: no model, like hand-written rules or a die roll. Shown at its score for reference, not ranked.' },
+};
+
+// One tooltip for the tags, placed against the window so the table's scrolling box can't clip it. Hover or focus shows
+// it; a click (a tap on phones) pins it until a click elsewhere, Escape, or a scroll.
+let tip: HTMLElement | null = null;
+let tipFor: HTMLButtonElement | null = null;
+let pinned = false;
+function showTip(button: HTMLButtonElement, text: string): void {
+  if (!tip) {
+    tip = el('div', undefined, 'kind-tip');
+    tip.id = 'kind-tip';
+    tip.setAttribute('role', 'tooltip');
+    document.body.append(tip);
+    const close = () => hideTip(true);
+    document.addEventListener('click', (e) => {
+      if (!(e.target instanceof Element && e.target.closest('.kind-tag'))) close();
+    });
+    document.addEventListener('keydown', (e) => e.key === 'Escape' && close());
+    window.addEventListener('scroll', close, { passive: true });
+    window.addEventListener('resize', close);
+  }
+  tip.textContent = text;
+  tip.hidden = false;
+  tipFor?.removeAttribute('aria-describedby');
+  tipFor = button;
+  button.setAttribute('aria-describedby', 'kind-tip');
+  const r = button.getBoundingClientRect();
+  const width = tip.offsetWidth;
+  const height = tip.offsetHeight;
+  tip.style.left = `${Math.max(12, Math.min(r.left, document.documentElement.clientWidth - width - 12))}px`;
+  tip.style.top = `${r.bottom + 8 + height > window.innerHeight ? r.top - 8 - height : r.bottom + 8}px`;
+}
+function hideTip(force = false): void {
+  if (!tip || (pinned && !force)) return;
+  pinned = false;
+  tip.hidden = true;
+  tipFor?.removeAttribute('aria-describedby');
+  tipFor = null;
+}
+/** The rank cell of a reference row: what it is instead of a number, explained on hover or a tap. */
+function kindTag(kind: ModelKind): HTMLElement {
+  const { tag: label, tip: text } = REFERENCE[kind]!;
+  const b = el('button', label, 'kind-tag');
+  b.type = 'button';
+  b.addEventListener('mouseenter', () => !pinned && showTip(b, text));
+  b.addEventListener('mouseleave', () => hideTip());
+  b.addEventListener('focus', () => !pinned && showTip(b, text));
+  b.addEventListener('blur', () => hideTip());
+  b.addEventListener('click', (e) => {
+    e.stopPropagation(); // on a phone row, a tap on the tag explains it instead of opening the row
+    const open = !(pinned && tipFor === b);
+    hideTip(true);
+    if (open) {
+      showTip(b, text);
+      pinned = true;
+    }
+  });
+  return b;
+}
+
 /**
  * The leaderboard on the main page: rank (=1 for models tied within the margin of error), model and maker, mean
  * score with its margin, then survival, latency, backup moves, cost and who ran the games. Community models
- * (self-reported submissions) are ranked with our runs by mean score. `table` is the full table; `list` is the same
- * ranking for phones, a row per model that opens its numbers when tapped.
+ * (self-reported submissions) are ranked with our runs by mean score. Only decision models are ranked: chat models
+ * and rules sit in the table at their score as reference rows, marked Chat or Base where the rank would be. `table`
+ * is the full table; `list` is the same ranking for phones, a row per model that opens its numbers when tapped.
  */
 export function renderLeaderboard(table: HTMLTableElement, list: HTMLElement, sub: HTMLElement, board: Leaderboard, community: Community | null): void {
-  // One ranking: our runs and the self-reported ones by mean score (ours first on an equal score).
-  const all: { e: LeaderboardEntry; by?: string; url?: string }[] = [...board.entries.map((e) => ({ e })), ...(community?.entries ?? []).map((e) => ({ e, by: e.by, url: e.url }))];
+  // One table: our runs (all decision models) and the self-reported ones by mean score (ours first on an equal score).
+  const all: { e: LeaderboardEntry; by?: string; url?: string; kind: ModelKind }[] = [...board.entries.map((e) => ({ e, kind: 'decision' as ModelKind })), ...(community?.entries ?? []).map((e) => ({ e, by: e.by, url: e.url, kind: e.kind }))];
   all.sort((a, b) => b.e.meanScore - a.e.meanScore);
-  const tied = new Set(jointLeaders(all.map((r) => r.e)));
+  // The ranking counts decision models only, so a reference row between two of them takes no place.
+  const ranked = all.filter((r) => r.kind === 'decision').map((r) => r.e);
+  const tied = new Set(jointLeaders(ranked));
+  const rankOf = (e: LeaderboardEntry) => (tied.has(e) ? '=1' : String(ranked.indexOf(e) + 1));
+  // Every row's bar on one scale, the best mean in the table, so a reference row reads against the models.
   const top = Math.max(1, ...all.map((r) => r.e.meanScore));
   const date = new Date(board.generatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   const lead = `${board.settings.gamesPerModel} games per model against the classic ghosts, last run on ${date}`;
@@ -71,9 +140,10 @@ export function renderLeaderboard(table: HTMLTableElement, list: HTMLElement, su
   }
   head.append(hr);
 
-  const row = (e: LeaderboardEntry, rank: string, opts: { tie: boolean; by?: string; url?: string }) => {
+  const row = (e: LeaderboardEntry, opts: { tie: boolean; by?: string; url?: string; kind: ModelKind }) => {
     const self = opts.by !== undefined;
-    const tr = el('tr', undefined, [opts.tie ? 'tie' : '', self ? 'self' : ''].filter(Boolean).join(' ') || undefined);
+    const ref = opts.kind !== 'decision';
+    const tr = el('tr', undefined, [opts.tie ? 'tie' : '', self ? 'self' : '', ref ? 'ref' : ''].filter(Boolean).join(' ') || undefined);
     const mdl = el('div', undefined, 'mdl');
     const who = el('div');
     // The name links to the model's page on opper.ai (specs, prices, routes), or for a self-reported model to the page
@@ -110,8 +180,10 @@ export function renderLeaderboard(table: HTMLTableElement, list: HTMLElement, su
     tdModel.append(mdl);
     const tdScore = el('td', undefined, 'hide-n');
     tdScore.append(scw);
+    const rk = el('td', undefined, 'rk');
+    rk.append(ref ? kindTag(opts.kind) : rankOf(e));
     tr.append(
-      el('td', rank, 'rk'),
+      rk,
       tdModel,
       tdScore,
       cell(e.bestScore === undefined ? '–' : e.bestScore.toLocaleString('en-US')), // the best single game; the ranking uses the mean
@@ -125,7 +197,7 @@ export function renderLeaderboard(table: HTMLTableElement, list: HTMLElement, su
   };
 
   const body = el('tbody');
-  all.forEach(({ e, by, url }, i) => body.append(row(e, tied.has(e) ? '=1' : String(i + 1), { tie: tied.has(e), by, url })));
+  all.forEach(({ e, by, url, kind }) => body.append(row(e, { tie: tied.has(e), by, url, kind })));
   table.replaceChildren(head, body);
 
   // Phones: rank, model, maker (or Community) and mean score per row; a tap opens the rest, one row at a time.
@@ -134,9 +206,10 @@ export function renderLeaderboard(table: HTMLTableElement, list: HTMLElement, su
     item.querySelector('.lbl-toggle')!.setAttribute('aria-expanded', String(open));
     item.querySelector<HTMLElement>('.lbl-d')!.hidden = !open;
   };
-  const listItem = (e: LeaderboardEntry, rank: string, i: number, opts: { tie: boolean; by?: string; url?: string }) => {
+  const listItem = (e: LeaderboardEntry, i: number, opts: { tie: boolean; by?: string; url?: string; kind: ModelKind }) => {
     const self = opts.by !== undefined;
-    const item = el('div', undefined, opts.tie ? 'lbl-row tie' : 'lbl-row');
+    const ref = opts.kind !== 'decision';
+    const item = el('div', undefined, ['lbl-row', opts.tie ? 'tie' : '', ref ? 'ref' : ''].filter(Boolean).join(' '));
     // The name links where the table's does; a tap anywhere else on the row (or its chevron button) opens the numbers.
     const page = self ? undefined : pageOf(e.model);
     const own = self && opts.url && /^https?:\/\//.test(opts.url) ? opts.url : undefined;
@@ -154,7 +227,9 @@ export function renderLeaderboard(table: HTMLTableElement, list: HTMLElement, su
     toggle.setAttribute('aria-label', `${e.name}: all numbers`);
     toggle.append(chevron());
     const head = tag(el('div', undefined, 'lbl-head'), 'click_leaderboard_row', { source: 'mobile', model: e.model });
-    head.append(el('span', rank, 'rk'), markOf(e, name), who, el('span', e.meanScore.toLocaleString('en-US'), 'n'), toggle);
+    const rk = el('span', undefined, 'rk');
+    rk.append(ref ? kindTag(opts.kind) : rankOf(e));
+    head.append(rk, markOf(e, name), who, el('span', e.meanScore.toLocaleString('en-US'), 'n'), toggle);
     const details = el('dl', undefined, 'lbl-d');
     details.id = `lbl-${i}`;
     details.hidden = true;
@@ -181,5 +256,5 @@ export function renderLeaderboard(table: HTMLTableElement, list: HTMLElement, su
   };
   const cols = el('div', undefined, 'lbl-cols');
   cols.append(el('span', '#', 'rk'), el('span', 'Model', 'grow'), el('span', 'Mean score'));
-  list.replaceChildren(cols, ...all.map(({ e, by, url }, i) => listItem(e, tied.has(e) ? '=1' : String(i + 1), i, { tie: tied.has(e), by, url })));
+  list.replaceChildren(cols, ...all.map(({ e, by, url, kind }, i) => listItem(e, i, { tie: tied.has(e), by, url, kind })));
 }
