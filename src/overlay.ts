@@ -326,7 +326,8 @@ export function showPicker(root: HTMLElement, o: PickerOptions): Picker {
     b.type = 'button';
     const tri = el('span', '▶', 'tri');
     tri.setAttribute('aria-hidden', 'true');
-    b.append(tri, el('span', label, 'lbl'));
+    // Not `.lbl`: that is the phone leaderboard's list, hidden on wider screens.
+    b.append(tri, el('span', label, 'press-label'));
     return b;
   };
   let start: HTMLButtonElement;
@@ -348,7 +349,7 @@ export function showPicker(root: HTMLElement, o: PickerOptions): Picker {
   back.addEventListener('click', o.onBack);
   card.append(status, back);
   show(root, card, start);
-  const startLabel = start.querySelector<HTMLElement>('.lbl')!;
+  const startLabel = start.querySelector<HTMLElement>('.press-label')!;
   return {
     busy: (note) => {
       if (!o.canPlay) return;
