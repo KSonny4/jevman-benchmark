@@ -1,5 +1,5 @@
 import type { Leaderboard } from '../shared/leaderboard';
-import { boardOf } from '../shared/lineups';
+import { boardOf, MIXED_LINEUP, SOLO_MODELS } from '../shared/lineups';
 import { boardLabel, type BoardEntry, type Boards } from './highscores';
 import { modelName } from '../shared/models';
 import { logoFor } from './logos';
@@ -15,13 +15,13 @@ const GHOST_FILL: Record<GhostId, string> = { blinky: '#e53935', pinky: '#f48fb1
 /** The arcade's own ghost colours, for the picker's attract-screen roster. */
 export const ARCADE_FILL: Record<GhostId, string> = { blinky: '#ff0000', pinky: '#ffb8ff', inky: '#00ffff', clyde: '#ffb852' };
 
-/** The mixed lineup: a different AI behind each ghost, like the arcade original where every ghost had its own mind. */
-const MIXED: Lineup = { blinky: 'opper/clef', pinky: 'typesafe/jev-1.13.0', inky: 'opper/kev-4b', clyde: 'openai/gpt-6-luna-decisions' };
-const SOLO = ['typesafe/jev-1.13.0', 'opper/clef', 'opper/kev-4b', 'openai/gpt-6-luna-decisions'];
+/** The presets, as the high-score boards have them (shared/lineups.ts): Mixed, and each model on all four ghosts. */
+const MIXED: Lineup = MIXED_LINEUP;
+const SOLO = SOLO_MODELS;
 
 const allOf = (model: string): Lineup => Object.fromEntries(GHOST_IDS.map((g) => [g, model])) as Lineup;
 const sameLineup = (a: Lineup, b: Lineup) => GHOST_IDS.every((g) => a[g] === b[g]);
-const short = (model: string) => modelName(model).replace(/ 1\.13$/, '').replace(/ 4B$/, '');
+const short = (model: string) => modelName(model).replace(/ 1\.13$/, '').replace(/ 4B$/, '').replace(/^Microsoft /, '');
 
 /** The presets the picker offers, limited to the models this key can use. */
 export function presets(offered: string[]): { key: string; label: string; lineup: Lineup }[] {
@@ -109,17 +109,22 @@ export interface Picker {
   action: () => void;
 }
 
-/** A board as dotted lines, as the roster draws them: place, initials, score; the player's own line in yellow. */
-function boardLines(entries: BoardEntry[], limit: number, mine: number | null = null): HTMLOListElement {
+/**
+ * A board as dotted lines, as the roster draws them: place, initials, score; the player's own line in yellow. With
+ * `fill`, places nobody holds yet show as dim "---" lines, as on an arcade's empty table, so the board keeps its height.
+ */
+function boardLines(entries: BoardEntry[], limit: number, mine: number | null = null, fill = false): HTMLOListElement {
   const list = el('ol', undefined, 'dots board');
-  entries.slice(0, limit).forEach((e, i) => {
-    const li = el('li', undefined, i + 1 === mine ? 'you' : undefined);
-    li.style.setProperty('--gc', i + 1 === mine ? '#ffd800' : '#ffffff');
+  const lines: (BoardEntry | null)[] = entries.slice(0, limit);
+  while (fill && lines.length < limit) lines.push(null);
+  lines.forEach((e, i) => {
+    const li = el('li', undefined, e ? (i + 1 === mine ? 'you' : undefined) : 'open');
+    li.style.setProperty('--gc', !e ? 'var(--j-arc-dim)' : i + 1 === mine ? '#ffd800' : '#ffffff');
     const name = el('span', undefined, 'nm');
-    name.append(el('span', `${i + 1}`, 'rk'), e.initials);
+    name.append(el('span', `${i + 1}`, 'rk'), e ? e.initials : '---');
     const lead = el('span', undefined, 'lead');
     lead.setAttribute('aria-hidden', 'true');
-    li.append(name, lead, el('span', e.score.toLocaleString('en-US'), 'num'));
+    li.append(name, lead, el('span', e ? e.score.toLocaleString('en-US') : '–', 'num'));
     list.append(li);
   });
   return list;
@@ -252,7 +257,7 @@ const rosterName = (model: string) => short(model).replace(/^GPT-6 /, '');
  * model (a tap switches it), the lineups as arcade options, PRESS START, the cost, and the way back.
  */
 export function showPicker(root: HTMLElement, o: PickerOptions): Picker {
-  const card = el('div', undefined, 'card arc');
+  const card = el('div', undefined, 'card arc pick');
   card.setAttribute('role', 'dialog');
   card.setAttribute('aria-label', 'Who plays the ghosts?');
   const close = el('button', 'X', 'x');
@@ -309,15 +314,15 @@ export function showPicker(root: HTMLElement, o: PickerOptions): Picker {
     const key = boardOf(o.lineup());
     const boards = o.boards();
     if (!key) return hs.replaceChildren(el('p', 'High scores', 'colh'), el('p', 'Only the preset lineups have a board', 'tap'));
-    const entries = boards?.[key] ?? [];
-    hs.replaceChildren(el('p', `High scores · ${boardLabel(key)}`, 'colh'), entries.length ? boardLines(entries, 5) : el('p', boards ? 'No scores yet. Be the first!' : 'High scores are loading…', 'tap'));
+    // Three lines whatever the board holds: open places show as "---" until someone takes them.
+    hs.replaceChildren(el('p', `High scores · ${boardLabel(key)}`, 'colh'), boardLines(boards?.[key] ?? [], 3, null, true));
   };
   const renderAll = () => {
     render();
     renderBoard();
   };
   renderAll();
-  card.append(roster, el('p', 'Tap a ghost to switch its AI', 'tap'), opts, hs);
+  card.append(roster, el('p', 'Tap a ghost to switch its AI', 'tap'), opts);
   const status = el('p', undefined, 'tap');
   status.setAttribute('aria-live', 'polite');
   // The marker blinks, the words stay: a button that blinks out entirely reads as broken.
@@ -334,7 +339,8 @@ export function showPicker(root: HTMLElement, o: PickerOptions): Picker {
   if (o.canPlay) {
     start = press('Press start');
     start.addEventListener('click', o.onStart);
-    card.append(start, el('p', o.costNote, 'cost'));
+    // The lineup's top three sit below Start, so switching lineups never moves the button.
+    card.append(start, el('p', o.costNote, 'cost'), hs);
   } else {
     start = press('Sign in to play');
     start.disabled = !o.loginAvailable;
@@ -342,7 +348,7 @@ export function showPicker(root: HTMLElement, o: PickerOptions): Picker {
     const classic = el('button', 'Play the classic ghosts instead (free)', 'back');
     classic.type = 'button';
     classic.addEventListener('click', o.onClassic);
-    card.append(start, el('p', o.costNote, 'cost warn'), classic);
+    card.append(start, el('p', o.costNote, 'cost warn'), classic, hs);
   }
   const back = el('button', 'Back to watching', 'back');
   back.type = 'button';
