@@ -1,4 +1,4 @@
-# jevman
+# JevMan
 
 A Pac-Man benchmark for decision models: System One models (TypeSafe's jev, `typesafe/jev-1.13.0`, and the others
 Opper serves) steer Pac-Man in real time against the classic arcade ghosts, and `npm run leaderboard` measures which
@@ -62,7 +62,7 @@ cost, so the panel shows an **estimate** (`≈`) from token usage at TypeSafe's 
 ($0.042 per million input tokens; output is free). Like option A this is a local key, ignored on
 https deployments unless `JEV_ALLOW_DEV_KEY=1`. `npm run smoke` and `npm run bench` use it too.
 
-This is also the easiest way to play jevman without an Opper account: clone the repo, add your
+This is also the easiest way to play JevMan without an Opper account: clone the repo, add your
 TypeSafe key, `npm run dev`. The hosted page links here from its header, under "Sign in with Opper".
 
 ### Option D — free credits for everyone (the hosted page)
@@ -114,7 +114,7 @@ names explicitly (`--pacman-model`, `npm run leaderboard`) must be one of the
   mean score), which the site shows at `/leaderboard`, and prints a table. Same flags as `bench`, plus `--models id,id` (default: all),
   `--parallel 4` (games at a time per model); defaults to 8 games per model and a 300 s cap.
 - `npm run bench -- --endpoint http://…` — plays Pac-Man with any model behind your own HTTP endpoint; with
-  `--submit submissions/<id> --name … --by … --kind decision|chat|rules` it records the leaderboard's games as a submission. See
+  `--submit submissions/<id> --name … --by … --kind decision|trained|chat|rules` it records the leaderboard's games as a submission. See
   [CONTRIBUTING.md](CONTRIBUTING.md#benchmark-your-own-model).
 - `npm run submissions` — replays every submitted game in [`submissions/`](submissions) and writes
   `public/community.json`, the leaderboard's **self-reported** list. The image build runs it too, so a submission that
@@ -125,13 +125,15 @@ names explicitly (`--pacman-model`, `npm run leaderboard`) must be one of the
 ## Decision models
 
 Opper serves several System One decision models with the same API, listed in
-[`shared/models.ts`](shared/models.ts): `typesafe/jev-1.13.0` (TypeSafe, the default),
+[`shared/models.ts`](shared/models.ts): `typesafe/jev-1.13.0` (TypeSafe, the default) and its successor
+`typesafe/jev-1.14.0`,
 `opper/clef` and `opper/clef-flash` (Cloudflare), `opper/kev-4b` (a Qwen3.5-4B fine-tune by Jared
 Palmer), `berget/convaiinnovations/laya` (ConvAI Innovations; its 512-token context is shorter
 than one of our questions), `openai/gpt-6-luna-decisions` (OpenAI's GPT-6 Luna Decisions, which Opper translates
-to System One), `empiriolabs/aplomb-1` (EmpirioLabs' Aplomb 1) and `microsoft/decision-1` (Microsoft Decision 1,
-which Opper serves as `azure:global/microsoft-decision-1`). The server forwards only these. Through Opper any of them can play; a
-TypeSafe key (option C) reaches jev only.
+to System One), `empiriolabs/aplomb-1` (EmpirioLabs' Aplomb 1), `microsoft/decision-1` (Microsoft Decision 1,
+which Opper serves as `azure:global/microsoft-decision-1`) and `upright/eevo-1` (Upright's Eevo 1, which Opper serves
+as `eevo:eu/eevo-1`). The server forwards only these. Through Opper any of them can play, except Eevo 1: at 60 times
+jev's price per token it is on the leaderboard and in Watch only. A TypeSafe key (option C) reaches jev 1.13 only.
 
 Any other model can join the leaderboard as **self-reported**: anyone can run the benchmark against an endpoint and
 send the recorded games in a pull request, which CI replays. See
@@ -161,7 +163,7 @@ hour**; with the AI on both sides, about the two together. Lowering the speed ma
 ## Benchmark your own model
 
 Any model can join the [leaderboard](https://opper.ai/jevman-benchmark/leaderboard) as **self-reported**. Put it behind an
-HTTP endpoint that answers jevman's questions (copy [`scripts/example-endpoint.ts`](scripts/example-endpoint.ts)),
+HTTP endpoint that answers JevMan's questions (copy [`scripts/example-endpoint.ts`](scripts/example-endpoint.ts)),
 then:
 
 ```bash
@@ -243,7 +245,7 @@ stop timeout.
 
 ## License
 
-Copyright © 2026 Johnny Chadda. jevman is free software under the
+Copyright © 2026 Johnny Chadda. JevMan is free software under the
 [GNU Affero General Public License v3.0 or later](LICENSE). You may use, change and host it. If you
 run a modified version as a service, you must offer its users the source of your version, as the
 game's "Source on GitHub" link does for this one.

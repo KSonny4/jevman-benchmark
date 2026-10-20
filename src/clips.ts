@@ -1,9 +1,19 @@
 // Written by `npm run clips` (scripts/clips.ts): the highlight of each Watch recording in public/clips, and its sizes.
 export const CLIPS: Record<string, { file: string; mp4: number; gif: number }> = {
+  "typesafe/jev-1.14.0": {
+    "file": "jev-1-14",
+    "mp4": 546490,
+    "gif": 601369
+  },
   "semif": {
     "file": "semif",
     "mp4": 561421,
     "gif": 587414
+  },
+  "upright/eevo-1": {
+    "file": "eevo-1",
+    "mp4": 525333,
+    "gif": 635566
   },
   "typesafe/jev-1.13.0": {
     "file": "jev",

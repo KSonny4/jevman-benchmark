@@ -6,23 +6,27 @@ import { appPath } from './paths';
  */
 const LOGOS: Record<string, { src: string; maker: string; page?: string; shape?: 'round' | 'tile'; mono?: true }> = {
   'typesafe/jev-1.13.0': { src: 'logos/typesafe.png', maker: 'TypeSafe', page: 'typesafe/jev-1-13-0', shape: 'tile' },
+  // No page on opper.ai yet (2026-10-16).
+  'typesafe/jev-1.14.0': { src: 'logos/typesafe.png', maker: 'TypeSafe', shape: 'tile' },
   'opper/clef': { src: 'logos/cloudflare.svg', maker: 'Cloudflare', page: 'cloudflare/clef' },
   'opper/clef-flash': { src: 'logos/cloudflare.svg', maker: 'Cloudflare', page: 'cloudflare/clef-flash' },
   'opper/kev-4b': { src: 'logos/jared-palmer.webp', maker: 'Jared Palmer', page: 'community/kev-4b', shape: 'round' },
   'berget/convaiinnovations/laya': { src: 'logos/convai.webp', maker: 'Convai Innovations', page: 'community/laya', shape: 'tile' },
   'openai/gpt-6-luna-decisions': { src: 'logos/openai.svg', maker: 'OpenAI', page: 'openai/gpt-6-luna-decisions', mono: true },
   'empiriolabs/aplomb-1': { src: 'logos/empiriolabs.png', maker: 'EmpirioLabs', page: 'empiriolabs/aplomb-1', shape: 'round' },
-  // No page on opper.ai yet (2026-10-10).
-  'microsoft/decision-1': { src: 'logos/microsoft.svg', maker: 'Microsoft' },
+  'microsoft/decision-1': { src: 'logos/microsoft.svg', maker: 'Microsoft', page: 'microsoft/microsoft-decision-1' },
+  // Upright's Hugging Face avatar and favicon.
+  'upright/eevo-1': { src: 'logos/upright.png', maker: 'Upright', page: 'upright/eevo-1', shape: 'tile' },
 };
 
 /**
  * Community models (by submission id) get the mark their makers use on their own profiles too: the model's maker
- * (Qwen, Liquid AI), the project's own icon (RizzoFlow), or its author's GitHub or Hugging Face avatar. The random
- * baseline gets a die.
+ * (Qwen, Liquid AI, Bespoke Labs), the project's own icon (RizzoFlow), or its author's GitHub or Hugging Face avatar.
+ * The random baseline gets a die.
  */
 const COMMUNITY_LOGOS: Record<string, { src: string; shape?: 'round' | 'tile'; mono?: true }> = {
   semif: { src: 'logos/community/semif.png', shape: 'round' },
+  'nimble-v4-max': { src: 'logos/community/bespoke-labs.png' },
   'qwen-3-8-flash-next-nvfp4': { src: 'logos/community/qwen.svg' },
   'rizzo-flow': { src: 'logos/community/rizzo-flow.png' },
   'winnow-12b-nvfp4': { src: 'logos/community/eldanring.png', shape: 'round' },
