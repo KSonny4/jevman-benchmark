@@ -2,7 +2,7 @@
   "name": "ModernBERT-jev",
   "by": "KSonny4",
   "url": "https://github.com/KSonny4/modernbert-jev",
-  "kind": "decision",
+  "kind": "trained",
   "benchVersion": 1,
   "recordedAt": "2026-10-12T18:33:58.370Z",
   "games": 100
